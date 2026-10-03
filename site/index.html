@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#161915">
+  <meta name="description" content="衣序：从自己的衣柜开始，理解配色、比例与风格。">
+  <title>衣序 · 衣橱诊断</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23161915'/%3E%3Cpath d='M9 10h14M11 10v13h10V10M14 10V7h4v3' stroke='%23f3efe6' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --ink: #191c18;
+      --muted: #6f746d;
+      --paper: #f5f3ed;
+      --card: #fffef9;
+      --line: #deded5;
+      --dark: #181b17;
+      --accent: #c9ff45;
+      --blue: #a9c8e9;
+      --camel: #b88e62;
+      --safe-bottom: max(18px, env(safe-area-inset-bottom));
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: #d8d8d2; }
+    body { margin: 0; color: var(--ink); background: var(--paper); min-height: 100vh; }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .app { min-height: 100dvh; max-width: 520px; margin: 0 auto; background: var(--paper); position: relative; overflow-x: hidden; }
+    .screen { display: none; min-height: 100dvh; padding-bottom: 108px; }
+    .screen.active { display: block; animation: reveal .35s ease both; }
+    @keyframes reveal { from { opacity: 0; transform: translateY(8px); } }
+
+    .topbar { height: 60px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 15; background: rgba(245,243,237,.92); backdrop-filter: blur(16px); }
+    .brand { font-family: Georgia, "Songti SC", serif; font-size: 21px; font-weight: 700; letter-spacing: .08em; }
+    .step { font-size: 13px; color: var(--muted); letter-spacing: .04em; }
+    .ghost-icon { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 50%; background: transparent; display: grid; place-items: center; color: var(--ink); }
+    .ghost-icon svg { width: 18px; height: 18px; }
+
+    main { padding: 12px 20px 28px; }
+    .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .16em; color: var(--muted); margin: 14px 0 10px; }
+    h1 { font-family: Georgia, "Songti SC", serif; font-size: clamp(34px, 10vw, 48px); line-height: 1.08; letter-spacing: -.04em; margin: 0; font-weight: 500; }
+    h2 { font-family: Georgia, "Songti SC", serif; font-size: 28px; margin: 0; letter-spacing: -.025em; }
+    h3 { margin: 0; font-size: 17px; }
+    p { line-height: 1.65; }
+    .lede { color: var(--muted); font-size: 15px; margin: 14px 0 22px; max-width: 32em; }
+
+    .progress { display: flex; gap: 6px; margin: 4px 0 24px; }
+    .progress i { height: 3px; flex: 1; background: var(--line); border-radius: 4px; }
+    .progress i.on { background: var(--ink); }
+
+    .capture-card { background: var(--dark); color: #fff; border-radius: 26px; padding: 18px; position: relative; overflow: hidden; min-height: 220px; }
+    .capture-card:after { content:""; position:absolute; width:180px; height:180px; border:1px solid rgba(255,255,255,.16); border-radius:50%; right:-65px; bottom:-75px; box-shadow: 0 0 0 28px rgba(255,255,255,.035), 0 0 0 56px rgba(255,255,255,.025); }
+    .capture-number { color: var(--accent); font: 42px/1 Georgia, serif; }
+    .capture-title { font-size: 19px; margin: 34px 0 7px; }
+    .capture-note { color: #b7bbb4; font-size: 13px; max-width: 240px; margin: 0 0 20px; }
+    .capture-actions { display: flex; gap: 10px; position: relative; z-index: 2; }
+    .light-button { border: 0; background: #fff; color: #111; border-radius: 999px; padding: 13px 17px; font-weight: 650; display: inline-flex; align-items: center; gap: 8px; }
+    .dark-outline { border: 1px solid #555a53; background: transparent; color: #fff; border-radius: 999px; padding: 13px 17px; }
+    .light-button svg { width: 17px; }
+    input[type=file] { display: none; }
+
+    .tip-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+    .tip { min-width: 0; padding: 13px 10px; border: 1px solid var(--line); border-radius: 16px; min-height: 86px; }
+    .tip strong { display: block; font-size: 13px; margin-bottom: 4px; }
+    .tip span { color: var(--muted); font-size: 12px; line-height: 1.4; display:block; overflow-wrap:anywhere; }
+    .tip-no { font-family: Georgia, serif; color: var(--camel); font-size: 16px; margin-bottom: 8px; }
+
+    .sample-link { width: 100%; border: 0; color: var(--ink); background: transparent; text-decoration: underline; text-underline-offset: 5px; margin-top: 21px; font-size: 14px; }
+
+    .wardrobe-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-top: 18px; }
+    .garment { position: relative; aspect-ratio: .78; background: #e3e2de; border-radius: 16px; overflow: hidden; border: 2px solid transparent; }
+    .garment.selected { border-color: var(--ink); }
+    .garment .crop { width: 100%; height: 100%; background-image: url('./assets/capsule-wardrobe.jpg'); background-size: 310% auto; background-repeat: no-repeat; }
+    .garment .check { position:absolute; top:7px; right:7px; width:22px; height:22px; border-radius:50%; display:grid; place-items:center; background: var(--ink); color:white; font-size:12px; }
+    .garment .tag { position:absolute; left:6px; bottom:6px; background: rgba(255,255,255,.9); backdrop-filter: blur(5px); border-radius:999px; font-size:11px; padding:5px 7px; }
+    .garment.uploaded img { width:100%; height:100%; object-fit:cover; }
+    .add-tile { display:grid; place-items:center; border: 1px dashed #aaa; background: transparent; color: var(--muted); text-align:center; font-size:12px; }
+    .add-tile b { display:block; font-size:26px; line-height:1; font-weight:300; color:var(--ink); margin-bottom:6px; }
+
+    .edit-list { margin-top: 24px; border-top: 1px solid var(--line); }
+    .edit-row { display:flex; align-items:center; justify-content:space-between; padding: 17px 0; border-bottom:1px solid var(--line); font-size:14px; }
+    .edit-row span:last-child { color:var(--muted); }
+    .bottom-action { position:fixed; left:50%; bottom:0; transform:translateX(-50%); z-index:20; width:min(520px, 100%); padding: 12px 20px var(--safe-bottom); background:linear-gradient(180deg, rgba(245,243,237,0), var(--paper) 24%); }
+    .primary { width:100%; border:0; border-radius:999px; padding:17px 20px; color:white; background:var(--dark); font-weight:700; box-shadow: 0 8px 24px rgba(15,18,14,.18); }
+    .primary:disabled { opacity:.4; }
+
+    .analysis { position:fixed; inset:0; z-index:40; background:var(--dark); color:white; display:none; align-items:center; justify-content:center; text-align:center; padding:32px; }
+    .analysis.open { display:flex; }
+    .scan-orbit { width:150px; height:150px; border-radius:50%; border:1px solid #5c6158; display:grid; place-items:center; margin:0 auto 32px; position:relative; }
+    .scan-orbit:before { content:""; position:absolute; width:100%; height:100%; border-top:2px solid var(--accent); border-radius:50%; animation: spin 1.2s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .scan-orbit span { font:42px Georgia,serif; color:var(--accent); }
+    .analysis h2 { font-size:27px; }
+    .analysis p { color:#aeb2aa; font-size:14px; }
+
+    .report-hero { background:var(--dark); color:white; margin: -12px -20px 0; padding: 20px 20px 28px; border-radius: 0 0 30px 30px; }
+    .report-date { color:#9fa49c; font-size:12px; letter-spacing:.08em; }
+    .report-head { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:17px; }
+    .report-head h1 { font-size:34px; }
+    .score { width:96px; height:96px; border-radius:50%; background: conic-gradient(var(--accent) 0 78%, #3a3e37 78% 100%); display:grid; place-items:center; flex:0 0 auto; position:relative; }
+    .score:after { content:""; width:78px; height:78px; border-radius:50%; background:var(--dark); position:absolute; }
+    .score strong, .score small { position:relative; z-index:1; display:block; text-align:center; }
+    .score strong { font:31px/1 Georgia,serif; }
+    .score small { color:#9fa49c; font-size:10px; margin-top:3px; }
+    .report-summary { color:#c6cac2; font-size:14px; max-width:300px; margin:14px 0 0; }
+
+    .report-tabs { display:flex; gap:6px; margin:18px 0; overflow:auto; scrollbar-width:none; }
+    .report-tabs button { white-space:nowrap; padding:10px 14px; border:1px solid var(--line); background:transparent; border-radius:999px; color:var(--muted); }
+    .report-tabs button.active { background:var(--ink); color:#fff; border-color:var(--ink); }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; animation:reveal .28s ease both; }
+    .section-card { background:var(--card); border:1px solid var(--line); border-radius:22px; padding:18px; margin-bottom:12px; }
+    .card-kicker { color:var(--muted); font-size:12px; margin-bottom:7px; }
+    .palette { display:flex; gap:7px; margin:18px 0 8px; }
+    .swatch { height:52px; flex:1; border-radius:12px; position:relative; }
+    .swatch span { position:absolute; bottom:5px; left:7px; font-size:10px; padding:2px 5px; border-radius:8px; background:rgba(255,255,255,.76); }
+    .insight { display:flex; gap:12px; align-items:flex-start; padding:15px 0; border-top:1px solid var(--line); }
+    .insight:first-of-type { border-top:0; }
+    .insight-no { width:28px; height:28px; border-radius:50%; background:#ecece4; display:grid; place-items:center; font:14px Georgia,serif; flex:0 0 auto; }
+    .insight p { margin:3px 0 0; color:var(--muted); font-size:13px; line-height:1.55; }
+    .metric { margin-top:16px; }
+    .metric-label { display:flex; justify-content:space-between; font-size:13px; margin-bottom:7px; }
+    .metric-bar { height:7px; background:#e9e8e1; border-radius:5px; overflow:hidden; }
+    .metric-bar i { display:block; height:100%; background:var(--ink); border-radius:5px; }
+
+    .outfit { background:var(--card); border:1px solid var(--line); border-radius:22px; overflow:hidden; margin-bottom:13px; }
+    .outfit-visual { height:205px; background-image:url('./assets/capsule-wardrobe.jpg'); background-size:cover; background-position:center 36%; position:relative; }
+    .outfit-badge { position:absolute; left:12px; top:12px; color:#fff; background:rgba(20,22,19,.82); padding:7px 10px; border-radius:999px; font-size:11px; backdrop-filter:blur(7px); }
+    .outfit-copy { padding:16px; }
+    .outfit-copy p { color:var(--muted); font-size:13px; margin:7px 0 12px; }
+    .reason { background:#eff0e9; border-radius:13px; padding:11px 12px; font-size:12px; line-height:1.55; }
+    .feedback { display:flex; gap:8px; margin-top:12px; }
+    .feedback button { flex:1; padding:9px; border-radius:999px; border:1px solid var(--line); background:white; font-size:12px; }
+    .feedback button.chosen { background:var(--ink); color:white; }
+    .mix-intro { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; margin:4px 0 13px; }
+    .mix-intro p { margin:5px 0 0; color:var(--muted); font-size:13px; }
+    .combo-picker { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin-bottom:12px; }
+    .combo-choice { min-width:0; padding:10px; text-align:left; border:1px solid var(--line); background:var(--card); border-radius:16px; color:var(--ink); }
+    .combo-choice.active { color:#fff; background:var(--dark); border-color:var(--dark); }
+    .combo-choice b { display:block; font-size:12px; margin-top:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .mini-palette { display:flex; height:19px; border-radius:7px; overflow:hidden; }
+    .mini-palette i { flex:1; }
+    .look-parts { display:flex; flex-wrap:wrap; gap:6px; margin:13px 0; }
+    .look-parts span { border:1px solid var(--line); border-radius:999px; padding:6px 9px; font-size:11px; background:#fff; }
+    .accessory-plan { border-top:1px solid var(--line); border-bottom:1px solid var(--line); margin:15px 0; }
+    .accessory-row { display:grid; grid-template-columns:34px 1fr; gap:10px; align-items:start; padding:13px 0; }
+    .accessory-row + .accessory-row { border-top:1px solid var(--line); }
+    .color-dot { width:28px; height:28px; border-radius:50%; border:1px solid rgba(0,0,0,.13); box-shadow:inset 0 0 0 4px rgba(255,255,255,.45); }
+    .accessory-row strong { display:block; font-size:13px; }
+    .accessory-row p { margin:3px 0 0; font-size:12px; line-height:1.5; }
+    .alternative { display:inline-block; margin-top:5px; font-size:11px; color:var(--muted); }
+    .color-rules { background:var(--dark); color:#fff; border-radius:22px; padding:18px; margin-top:14px; }
+    .color-rules .card-kicker { color:#9fa49c; }
+    .rule { display:grid; grid-template-columns:24px 1fr; gap:9px; padding:13px 0; border-top:1px solid #373b35; }
+    .rule:first-of-type { margin-top:9px; }
+    .rule em { font:16px Georgia,serif; color:var(--accent); font-style:normal; }
+    .rule strong { display:block; font-size:13px; }
+    .rule p { color:#aeb2aa; font-size:12px; margin:4px 0 0; line-height:1.5; }
+
+    .buy-card { border-radius:22px; padding:18px; background:var(--blue); margin-bottom:12px; }
+    .buy-card:nth-child(2) { background:#d9c2a7; }
+    .buy-top { display:flex; justify-content:space-between; gap:12px; }
+    .priority { font-size:11px; border:1px solid rgba(0,0,0,.24); border-radius:999px; padding:5px 8px; height:fit-content; }
+    .gain { display:inline-flex; align-items:baseline; gap:5px; margin-top:20px; }
+    .gain strong { font:32px Georgia,serif; }
+    .buy-card p { font-size:13px; margin:7px 0 0; }
+    .avoid { border:1px solid var(--line); border-radius:18px; padding:15px; font-size:13px; color:var(--muted); }
+
+    .toast { position:fixed; left:50%; bottom:100px; transform:translate(-50%, 20px); background:var(--ink); color:white; padding:11px 16px; border-radius:999px; opacity:0; pointer-events:none; transition:.25s; z-index:50; font-size:13px; }
+    .toast.show { opacity:1; transform:translate(-50%, 0); }
+
+    @media (min-width: 700px) {
+      body { padding:28px 0; }
+      .app { min-height: calc(100vh - 56px); border-radius:32px; box-shadow:0 30px 90px rgba(28,31,27,.2); }
+      .screen { min-height: calc(100vh - 56px); }
+      .bottom-action { width:520px; bottom:28px; }
+      .analysis { max-width:520px; left:50%; transform:translateX(-50%); border-radius:32px; top:28px; bottom:28px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *:before, *:after { animation-duration:.01ms !important; transition-duration:.01ms !important; } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <section class="screen active" id="capture-screen">
+    <header class="topbar"><div class="brand">衣序</div><div class="step">衣橱诊断 · 01</div></header>
+    <main>
+      <div class="progress"><i class="on"></i><i></i><i></i></div>
+      <div class="eyebrow">从你的衣柜开始</div>
+      <h1>先看看，<br>你已经拥有什么。</h1>
+      <p class="lede">录入几件常穿的衣服，我们会从色彩、品类和连接度中，找到你的风格线索。</p>
+
+      <div class="capture-card">
+        <div class="capture-number">06</div>
+        <div class="capture-title">建议先录入 6 件</div>
+        <p class="capture-note">3 件上装、2 件下装、1 双鞋，就能生成第一份轻诊断。</p>
+        <div class="capture-actions">
+          <button class="light-button" data-open="camera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>拍摄衣物</button>
+          <button class="dark-outline" data-open="album">从相册选择</button>
+        </div>
+        <input type="file" id="camera" accept="image/*" capture="environment">
+        <input type="file" id="album" accept="image/*" multiple>
+      </div>
+
+      <div class="tip-row" aria-label="拍摄建议">
+        <div class="tip"><div class="tip-no">01</div><strong>单件拍摄</strong><span>避免衣物重叠</span></div>
+        <div class="tip"><div class="tip-no">02</div><strong>自然光线</strong><span>颜色会更准确</span></div>
+        <div class="tip"><div class="tip-no">03</div><strong>干净背景</strong><span>完整露出轮廓</span></div>
+      </div>
+      <button class="sample-link" id="sample-button">暂时没有照片，使用示例衣橱体验</button>
+    </main>
+  </section>
+
+  <section class="screen" id="review-screen">
+    <header class="topbar"><button class="ghost-icon back" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5l-7 7 7 7"/></svg></button><div class="step">确认衣物 · 02</div></header>
+    <main>
+      <div class="progress"><i class="on"></i><i class="on"></i><i></i></div>
+      <div class="eyebrow">识别结果</div>
+      <h2>看看我们认对了吗？</h2>
+      <p class="lede">点选衣物可移出本次诊断。正式版本中，品类和颜色都可以修改。</p>
+      <div class="wardrobe-grid" id="wardrobe-grid"></div>
+      <div class="edit-list">
+        <div class="edit-row"><span>本次诊断</span><span id="item-count">6 件衣物</span></div>
+        <div class="edit-row"><span>主要季节</span><span>春秋 · 四季</span></div>
+        <div class="edit-row"><span>主要场景</span><span>日常 · 通勤</span></div>
+      </div>
+    </main>
+    <div class="bottom-action"><button class="primary" id="diagnose-button">生成我的衣橱诊断</button></div>
+  </section>
+
+  <section class="screen" id="report-screen">
+    <header class="topbar"><div class="brand">衣序</div><button class="ghost-icon" id="restart" aria-label="重新诊断"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 7v5h5M6.5 16a7 7 0 1 0-.8-7"/></svg></button></header>
+    <main>
+      <div class="report-hero">
+        <div class="report-date">WARDROBE NOTE · NO. 001</div>
+        <div class="report-head">
+          <div><div class="eyebrow" style="color:#a8ada4">你的衣橱关键词</div><h1>克制、清爽<br>有一点松弛</h1></div>
+          <div class="score"><div><strong>78</strong><small>健康度</small></div></div>
+        </div>
+        <p class="report-summary">中性色构成了稳定基础，蓝色让整体更清醒。你已经拥有一套可靠的日常衣橱骨架。</p>
+      </div>
+
+      <nav class="report-tabs" aria-label="诊断报告分类">
+        <button class="active" data-tab="diagnosis">诊断</button>
+        <button data-tab="outfits">潜在搭配</button>
+        <button data-tab="shopping">购买建议</button>
+      </nav>
+
+      <div class="tab-panel active" id="diagnosis">
+        <article class="section-card">
+          <div class="card-kicker">色彩结构</div><h3>冷静中性色，暖色负责连接</h3>
+          <div class="palette">
+            <div class="swatch" style="background:#f0ede2"><span>米白 25%</span></div>
+            <div class="swatch" style="background:#a9c8e9"><span>浅蓝 18%</span></div>
+            <div class="swatch" style="background:#25282c"><span>深色 39%</span></div>
+            <div class="swatch" style="background:#b88e62"><span>棕色 18%</span></div>
+          </div>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:0">米白与浅蓝让深色下装显得更轻，驼色外套和棕色鞋形成了自然的暖色呼应。</p>
+        </article>
+
+        <article class="section-card">
+          <div class="card-kicker">最值得关注的 3 件事</div>
+          <div class="insight"><div class="insight-no">1</div><div><h3>浅蓝衬衫是连接核心</h3><p>它可以与两条下装和两件外搭组合，正式度也覆盖日常与通勤。</p></div></div>
+          <div class="insight"><div class="insight-no">2</div><div><h3>下装选择稍显集中</h3><p>目前都属于深色直筒轮廓，稳定耐穿，同时限制了轻盈风格的可能。</p></div></div>
+          <div class="insight"><div class="insight-no">3</div><div><h3>风格倾向：简约自然</h3><p>低饱和色、利落轮廓和天然材质感，共同形成克制而松弛的表达。</p></div></div>
+        </article>
+
+        <article class="section-card">
+          <div class="card-kicker">结构评分</div><h3>衣柜基础稳定，变化空间充足</h3>
+          <div class="metric"><div class="metric-label"><span>色彩协调度</span><b>88</b></div><div class="metric-bar"><i style="width:88%"></i></div></div>
+          <div class="metric"><div class="metric-label"><span>搭配连接度</span><b>82</b></div><div class="metric-bar"><i style="width:82%"></i></div></div>
+          <div class="metric"><div class="metric-label"><span>品类完整度</span><b>64</b></div><div class="metric-bar"><i style="width:64%"></i></div></div>
+        </article>
+      </div>
+
+      <div class="tab-panel" id="outfits">
+        <div class="mix-intro"><div><div class="card-kicker">组合实验室</div><h3>用现有衣物，试三种表达</h3><p>点击组合，查看鞋袜如何完成整体。</p></div></div>
+        <div class="combo-picker" aria-label="选择搭配组合">
+          <button class="combo-choice active" data-combo="0"><span class="mini-palette"><i style="background:#a9c8e9"></i><i style="background:#3c3e41"></i><i style="background:#784b32"></i></span><b>01 清爽通勤</b></button>
+          <button class="combo-choice" data-combo="1"><span class="mini-palette"><i style="background:#f0ede2"></i><i style="background:#253247"></i><i style="background:#b88e62"></i></span><b>02 松弛周末</b></button>
+          <button class="combo-choice" data-combo="2"><span class="mini-palette"><i style="background:#f0ede2"></i><i style="background:#55565a"></i><i style="background:#a77d55"></i></span><b>03 温和利落</b></button>
+        </div>
+        <article class="outfit" id="combo-card" aria-live="polite"></article>
+        <article class="color-rules">
+          <div class="card-kicker">鞋袜配色方法</div><h3>让脚下成为一段连接</h3>
+          <div class="rule"><em>1</em><div><strong>鞋色呼应一个上半身颜色</strong><p>鞋与外套、腰带或包同色，整体会更有收束感。</p></div></div>
+          <div class="rule"><em>2</em><div><strong>袜色优先连接裤子</strong><p>袜子比裤子浅一至两度，衔接自然，也能保留层次。</p></div></div>
+          <div class="rule"><em>3</em><div><strong>用露袜长度控制风格</strong><p>露 1–3 cm 更利落；露 4–7 cm 更休闲，也更强调袜子的存在。</p></div></div>
+        </article>
+      </div>
+
+      <div class="tab-panel" id="shopping">
+        <article class="buy-card"><div class="buy-top"><div><div class="card-kicker">优先补充</div><h3>米灰色直筒半裙</h3></div><span class="priority">优先级 A</span></div><div class="gain"><strong>+5</strong><span>套潜在搭配</span></div><p>选择中高腰、过膝长度和轻微 A 字轮廓，可以连接现有三件上装，并补充更轻盈的下装选择。</p></article>
+        <article class="buy-card"><div class="buy-top"><div><div class="card-kicker">可以考虑</div><h3>低饱和酒红色内搭</h3></div><span class="priority">优先级 B</span></div><div class="gain"><strong>+3</strong><span>套潜在搭配</span></div><p>小面积暖色可以丰富现有冷色结构。建议选择细针织或柔软棉质，避免过亮的正红色。</p></article>
+        <div class="avoid"><strong style="color:var(--ink)">近期可以少买</strong><br><br>深色直筒裤的功能已经重复。下一次购物前，可以先问自己：它能否与衣柜中至少 3 件衣服组合？</div>
+      </div>
+    </main>
+  </section>
+
+  <div class="analysis" id="analysis" role="status" aria-live="polite"><div><div class="scan-orbit"><span id="scan-count">0%</span></div><h2 id="scan-title">正在理解你的衣柜</h2><p id="scan-detail">识别颜色、轮廓与品类关系</p></div></div>
+  <div class="toast" id="toast">已记录，会让下一次推荐更懂你</div>
+</div>
+
+<script>
+  const screens = [...document.querySelectorAll('.screen')];
+  const analysis = document.getElementById('analysis');
+  const grid = document.getElementById('wardrobe-grid');
+  const countLabel = document.getElementById('item-count');
+  const toast = document.getElementById('toast');
+  const sampleItems = [
+    ['米白针织', '7% 12%'], ['浅蓝衬衫', '50% 13%'], ['驼色风衣', '96% 18%'],
+    ['深灰西裤', '5% 72%'], ['深蓝牛仔', '50% 72%'], ['棕色乐福鞋', '94% 82%']
+  ];
+  const combinations = [
+    {
+      badge:'通勤 · 清爽利落', position:'center 36%',
+      title:'浅蓝衬衫 + 深灰西裤',
+      note:'衬衫前侧轻塞，袖口卷一折。保持肩线和裤线利落，适合日常通勤。',
+      parts:['浅蓝衬衫','深灰西裤','棕色乐福鞋'],
+      shoeColor:'#784b32', shoe:'焦糖棕乐福鞋', shoeWhy:'与冷色衣裤形成轻微冷暖对比，让组合更亲近。', shoeAlt:'替代鞋色：深巧克力棕、酒红棕',
+      sockColor:'#b8b6ad', sock:'燕麦灰中筒袜 · 露 2–3 cm', sockWhy:'介于浅蓝和深灰之间，能柔和连接裤脚与鞋面。',
+      reason:'配色逻辑：蓝、灰负责清爽和秩序；棕色提供暖意；燕麦灰袜子承担中间过渡。'
+    },
+    {
+      badge:'周末 · 松弛自然', position:'center 66%',
+      title:'米白针织 + 深蓝牛仔裤 + 驼色风衣',
+      note:'风衣敞开，让米白成为提亮区域。裤脚轻卷一折，增加轻松感。',
+      parts:['米白针织','深蓝牛仔裤','驼色风衣'],
+      shoeColor:'#a96f45', shoe:'暖棕乐福鞋', shoeWhy:'与驼色风衣形成上下呼应，稳定大面积的深蓝色。', shoeAlt:'替代鞋色：奶油白、浅沙色',
+      sockColor:'#e7dfcf', sock:'暖米白罗纹袜 · 露 4–6 cm', sockWhy:'与针织衫同属暖白色系，露出一小段会显得轻松而完整。',
+      reason:'配色逻辑：上衣和袜子上下提亮，风衣与鞋形成暖棕色框架，深蓝牛仔裤压住重心。'
+    },
+    {
+      badge:'轻社交 · 温和利落', position:'center 48%',
+      title:'米白针织 + 深灰西裤 + 驼色风衣',
+      note:'针织衫自然垂落或半塞，风衣保持敞开。轮廓简洁，颜色更显柔和。',
+      parts:['米白针织','深灰西裤','驼色风衣'],
+      shoeColor:'#4a342b', shoe:'深巧克力色乐福鞋', shoeWhy:'深色鞋与西裤保持视觉连续，棕调也能回应驼色风衣。', shoeAlt:'替代鞋色：黑色、深咖啡色',
+      sockColor:'#57575a', sock:'炭灰细针袜 · 露 1–2 cm', sockWhy:'与裤子接近的颜色能延长腿部线条，适合偏利落的表达。',
+      reason:'配色逻辑：米白减轻深灰的正式感，驼色增加温度，深灰袜与深棕鞋让视觉重心保持稳定。'
+    }
+  ];
+  let items = [];
+
+  function showScreen(id) {
+    screens.forEach(s => s.classList.toggle('active', s.id === id));
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  function useSample() {
+    items = sampleItems.map((item, index) => ({name:item[0], position:item[1], selected:true, index}));
+    renderGrid(); showScreen('review-screen');
+  }
+
+  function renderGrid() {
+    grid.innerHTML = '';
+    items.forEach((item, index) => {
+      const tile = document.createElement('button');
+      tile.className = `garment ${item.selected ? 'selected' : ''} ${item.url ? 'uploaded' : ''}`;
+      tile.setAttribute('aria-label', `${item.name}，${item.selected ? '已选择' : '未选择'}`);
+      tile.innerHTML = item.url
+        ? `<img src="${item.url}" alt="用户上传的衣物"><span class="check">${item.selected ? '✓' : '+'}</span><span class="tag">${item.name}</span>`
+        : `<div class="crop" style="background-position:${item.position}"></div><span class="check">${item.selected ? '✓' : '+'}</span><span class="tag">${item.name}</span>`;
+      tile.addEventListener('click', () => { items[index].selected = !items[index].selected; renderGrid(); });
+      grid.appendChild(tile);
+    });
+    const add = document.createElement('button');
+    add.className = 'garment add-tile'; add.innerHTML = '<span><b>＋</b>继续添加</span>';
+    add.addEventListener('click', () => document.getElementById('album').click());
+    grid.appendChild(add);
+    const selected = items.filter(i => i.selected).length;
+    countLabel.textContent = `${selected} 件衣物`;
+    document.getElementById('diagnose-button').disabled = selected < 3;
+  }
+
+  function addFiles(fileList) {
+    const files = [...fileList].slice(0, 9);
+    if (!files.length) return;
+    files.forEach((file, index) => items.push({name:`衣物 ${items.length + 1}`, url:URL.createObjectURL(file), selected:true, index}));
+    renderGrid(); showScreen('review-screen');
+  }
+
+  document.querySelectorAll('[data-open]').forEach(btn => btn.addEventListener('click', () => document.getElementById(btn.dataset.open).click()));
+  document.getElementById('camera').addEventListener('change', e => addFiles(e.target.files));
+  document.getElementById('album').addEventListener('change', e => addFiles(e.target.files));
+  document.getElementById('sample-button').addEventListener('click', useSample);
+  document.querySelector('.back').addEventListener('click', () => showScreen('capture-screen'));
+  document.getElementById('restart').addEventListener('click', () => { items = []; showScreen('capture-screen'); });
+
+  document.getElementById('diagnose-button').addEventListener('click', () => {
+    analysis.classList.add('open');
+    let progress = 0;
+    const states = [
+      [0, '正在理解你的衣柜', '识别颜色、轮廓与品类关系'],
+      [36, '寻找潜在连接', '计算单品之间的搭配可能'],
+      [72, '整理审美线索', '生成易理解、可行动的建议']
+    ];
+    const timer = setInterval(() => {
+      progress += Math.floor(Math.random() * 9) + 4;
+      if (progress >= 100) {
+        clearInterval(timer); document.getElementById('scan-count').textContent = '100%';
+        setTimeout(() => { analysis.classList.remove('open'); showScreen('report-screen'); }, 350); return;
+      }
+      document.getElementById('scan-count').textContent = `${progress}%`;
+      const current = [...states].reverse().find(s => progress >= s[0]);
+      document.getElementById('scan-title').textContent = current[1];
+      document.getElementById('scan-detail').textContent = current[2];
+    }, 110);
+  });
+
+  document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b === button));
+    document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.toggle('active', panel.id === button.dataset.tab));
+  }));
+
+  function bindFeedback() {
+    document.querySelectorAll('.feedback button').forEach(button => button.addEventListener('click', () => {
+      button.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('chosen'));
+      button.classList.add('chosen'); toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 1800);
+    }));
+  }
+
+  function renderCombination(index) {
+    const combo = combinations[index];
+    const card = document.getElementById('combo-card');
+    card.innerHTML = `
+      <div class="outfit-visual" style="background-position:${combo.position}"><span class="outfit-badge">${combo.badge}</span></div>
+      <div class="outfit-copy">
+        <h3>${combo.title}</h3><p>${combo.note}</p>
+        <div class="look-parts">${combo.parts.map(part => `<span>${part}</span>`).join('')}</div>
+        <div class="accessory-plan">
+          <div class="accessory-row"><span class="color-dot" style="background:${combo.shoeColor}"></span><div><strong>鞋子｜${combo.shoe}</strong><p>${combo.shoeWhy}</p><span class="alternative">${combo.shoeAlt}</span></div></div>
+          <div class="accessory-row"><span class="color-dot" style="background:${combo.sockColor}"></span><div><strong>袜子｜${combo.sock}</strong><p>${combo.sockWhy}</p></div></div>
+        </div>
+        <div class="reason">${combo.reason}</div>
+        <div class="feedback"><button>适合我</button><button>不喜欢</button></div>
+      </div>`;
+    bindFeedback();
+  }
+
+  document.querySelectorAll('[data-combo]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-combo]').forEach(choice => choice.classList.toggle('active', choice === button));
+    renderCombination(Number(button.dataset.combo));
+  }));
+  renderCombination(0);
+
+  // 在支持 WebMCP 的浏览器中，让智能助手可以触发与界面一致的示例诊断流程。
+  const modelContext = document.modelContext;
+  if (modelContext?.registerTool) {
+    try {
+      Promise.resolve(modelContext.registerTool({
+        name: 'start_sample_wardrobe_diagnosis',
+        title: '体验示例衣橱诊断',
+        description: '载入六件示例衣物，并进入衣物确认页面。',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        annotations: { readOnlyHint: false, untrustedContentHint: false },
+        execute() {
+          useSample();
+          return { status: 'ready', itemCount: 6, screen: 'review' };
+        }
+      })).catch(() => {});
+    } catch (_) {}
+  }
+</script>
+</body>
+</html>
+
