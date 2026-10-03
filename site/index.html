@@ -60,6 +60,19 @@
     .dark-outline { border: 1px solid #555a53; background: transparent; color: #fff; border-radius: 999px; padding: 13px 17px; }
     .light-button svg { width: 17px; }
     input[type=file] { display: none; }
+    .privacy-strip { display:flex; align-items:center; gap:10px; margin:12px 1px 0; padding:11px 12px; border:1px solid var(--line); border-radius:15px; color:var(--muted); }
+    .privacy-strip svg { width:20px; height:20px; flex:0 0 auto; color:var(--ink); }
+    .privacy-strip strong { display:block; color:var(--ink); font-size:13px; margin-bottom:2px; }
+    .privacy-strip span { display:block; font-size:12px; line-height:1.45; }
+    .local-vault { margin:0 0 12px; padding:16px; border-radius:20px; background:#e5e9d8; border:1px solid #d1d7c1; }
+    .local-vault[hidden] { display:none; }
+    .vault-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .vault-head p { margin:4px 0 0; color:#606658; font-size:12px; }
+    .vault-size { flex:0 0 auto; font:20px Georgia,serif; }
+    .vault-actions { display:flex; gap:8px; margin-top:13px; }
+    .vault-actions button { border-radius:999px; padding:10px 13px; font-size:12px; }
+    .vault-resume { flex:1; color:#fff; background:var(--dark); border:1px solid var(--dark); }
+    .vault-clear { color:var(--ink); background:transparent; border:1px solid #aeb49f; }
 
     .tip-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
     .tip { min-width: 0; padding: 13px 10px; border: 1px solid var(--line); border-radius: 16px; min-height: 86px; }
@@ -191,6 +204,11 @@
       <h1>先看看，<br>你已经拥有什么。</h1>
       <p class="lede">录入几件常穿的衣服，我们会从色彩、品类和连接度中，找到你的风格线索。</p>
 
+      <section class="local-vault" id="local-vault" hidden>
+        <div class="vault-head"><div><h3>你的本地衣橱还在这里</h3><p id="vault-detail">已保存在当前浏览器，清理浏览器数据后会删除。</p></div><span class="vault-size" id="vault-count">0</span></div>
+        <div class="vault-actions"><button class="vault-resume" id="resume-wardrobe">继续使用本地衣橱</button><button class="vault-clear" id="clear-wardrobe">清空</button></div>
+      </section>
+
       <div class="capture-card">
         <div class="capture-number">06</div>
         <div class="capture-title">建议先录入 6 件</div>
@@ -202,6 +220,7 @@
         <input type="file" id="camera" accept="image/*" capture="environment">
         <input type="file" id="album" accept="image/*" multiple>
       </div>
+      <div class="privacy-strip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><div><strong>照片仅保存在当前设备</strong><span>压缩后写入浏览器本地空间，全程不会上传。</span></div></div>
 
       <div class="tip-row" aria-label="拍摄建议">
         <div class="tip"><div class="tip-no">01</div><strong>单件拍摄</strong><span>避免衣物重叠</span></div>
@@ -308,6 +327,10 @@
   const grid = document.getElementById('wardrobe-grid');
   const countLabel = document.getElementById('item-count');
   const toast = document.getElementById('toast');
+  const vault = document.getElementById('local-vault');
+  const DB_NAME = 'yixu-local-wardrobe';
+  const DB_VERSION = 1;
+  const STORE_NAME = 'garments';
   const sampleItems = [
     ['米白针织', '7% 12%'], ['浅蓝衬衫', '50% 13%'], ['驼色风衣', '96% 18%'],
     ['深灰西裤', '5% 72%'], ['深蓝牛仔', '50% 72%'], ['棕色乐福鞋', '94% 82%']
@@ -342,6 +365,110 @@
     }
   ];
   let items = [];
+  let dbPromise;
+
+  function openWardrobeDB() {
+    if (!('indexedDB' in window)) return Promise.reject(new Error('当前浏览器不支持本地衣橱'));
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, {keyPath:'id'});
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('无法打开本地衣橱'));
+    });
+    return dbPromise;
+  }
+
+  async function readLocalWardrobe() {
+    const db = await openWardrobeDB();
+    return new Promise((resolve, reject) => {
+      const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll();
+      request.onsuccess = () => resolve(request.result.sort((a,b) => a.createdAt - b.createdAt));
+      request.onerror = () => reject(request.error || new Error('无法读取本地衣橱'));
+    });
+  }
+
+  async function saveLocalWardrobe() {
+    const records = items.filter(item => item.blob).map(item => ({
+      id:item.id, name:item.name, selected:item.selected, createdAt:item.createdAt, blob:item.blob
+    }));
+    const db = await openWardrobeDB();
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      store.clear();
+      records.forEach(record => store.put(record));
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error || new Error('无法保存本地衣橱'));
+      transaction.onabort = () => reject(transaction.error || new Error('保存已取消'));
+    });
+    updateLocalVault();
+  }
+
+  async function clearLocalWardrobe() {
+    const db = await openWardrobeDB();
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      transaction.objectStore(STORE_NAME).clear();
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error || new Error('无法清空本地衣橱'));
+    });
+    items.forEach(item => { if (item.url) URL.revokeObjectURL(item.url); });
+    items = [];
+    updateLocalVault();
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  function updateLocalVault() {
+    const localItems = items.filter(item => item.blob);
+    vault.hidden = localItems.length === 0;
+    document.getElementById('vault-count').textContent = `${localItems.length} 件`;
+    const bytes = localItems.reduce((sum, item) => sum + (item.blob?.size || 0), 0);
+    document.getElementById('vault-detail').textContent = `占用约 ${formatBytes(bytes)}，只保存在当前浏览器。`;
+  }
+
+  function showToast(message) {
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => toast.classList.remove('show'), 2100);
+  }
+
+  async function compressImage(file) {
+    if (!file.type.startsWith('image/')) throw new Error('请选择图片文件');
+    try {
+      const bitmap = await createImageBitmap(file);
+      const longest = Math.max(bitmap.width, bitmap.height);
+      const scale = Math.min(1, 1280 / longest);
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(bitmap, 0, 0, width, height);
+      bitmap.close?.();
+      return await new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('图片压缩失败')), 'image/jpeg', .82));
+    } catch (_) {
+      return file;
+    }
+  }
+
+  async function loadLocalWardrobe() {
+    try {
+      const saved = await readLocalWardrobe();
+      items.forEach(item => { if (item.url) URL.revokeObjectURL(item.url); });
+      items = saved.map(item => ({...item, url:URL.createObjectURL(item.blob)}));
+      updateLocalVault();
+    } catch (_) {
+      vault.hidden = true;
+    }
+  }
 
   function showScreen(id) {
     screens.forEach(s => s.classList.toggle('active', s.id === id));
@@ -349,6 +476,7 @@
   }
 
   function useSample() {
+    items.forEach(item => { if (item.url) URL.revokeObjectURL(item.url); });
     items = sampleItems.map((item, index) => ({name:item[0], position:item[1], selected:true, index}));
     renderGrid(); showScreen('review-screen');
   }
@@ -362,7 +490,11 @@
       tile.innerHTML = item.url
         ? `<img src="${item.url}" alt="用户上传的衣物"><span class="check">${item.selected ? '✓' : '+'}</span><span class="tag">${item.name}</span>`
         : `<div class="crop" style="background-position:${item.position}"></div><span class="check">${item.selected ? '✓' : '+'}</span><span class="tag">${item.name}</span>`;
-      tile.addEventListener('click', () => { items[index].selected = !items[index].selected; renderGrid(); });
+      tile.addEventListener('click', () => {
+        items[index].selected = !items[index].selected;
+        renderGrid();
+        if (items[index].blob) saveLocalWardrobe().catch(() => showToast('本地保存失败，请检查浏览器空间'));
+      });
       grid.appendChild(tile);
     });
     const add = document.createElement('button');
@@ -374,19 +506,39 @@
     document.getElementById('diagnose-button').disabled = selected < 3;
   }
 
-  function addFiles(fileList) {
+  async function addFiles(fileList) {
     const files = [...fileList].slice(0, 9);
     if (!files.length) return;
-    files.forEach((file, index) => items.push({name:`衣物 ${items.length + 1}`, url:URL.createObjectURL(file), selected:true, index}));
-    renderGrid(); showScreen('review-screen');
+    showToast('正在压缩并保存到本机…');
+    try {
+      const blobs = await Promise.all(files.map(compressImage));
+      blobs.forEach(blob => items.push({
+        id:crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+        name:`衣物 ${items.length + 1}`,
+        blob,
+        url:URL.createObjectURL(blob),
+        selected:true,
+        createdAt:Date.now() + items.length
+      }));
+      await saveLocalWardrobe();
+      navigator.storage?.persist?.().catch(() => {});
+      renderGrid(); showScreen('review-screen'); showToast('已保存在当前设备');
+    } catch (_) {
+      showToast('保存失败，请检查浏览器存储权限');
+    }
   }
 
   document.querySelectorAll('[data-open]').forEach(btn => btn.addEventListener('click', () => document.getElementById(btn.dataset.open).click()));
-  document.getElementById('camera').addEventListener('change', e => addFiles(e.target.files));
-  document.getElementById('album').addEventListener('change', e => addFiles(e.target.files));
+  document.getElementById('camera').addEventListener('change', async e => { await addFiles(e.target.files); e.target.value=''; });
+  document.getElementById('album').addEventListener('change', async e => { await addFiles(e.target.files); e.target.value=''; });
   document.getElementById('sample-button').addEventListener('click', useSample);
+  document.getElementById('resume-wardrobe').addEventListener('click', () => { renderGrid(); showScreen('review-screen'); });
+  document.getElementById('clear-wardrobe').addEventListener('click', async () => {
+    if (!confirm('清空后无法恢复当前浏览器中的衣橱照片，确定继续吗？')) return;
+    try { await clearLocalWardrobe(); showToast('本地衣橱已清空'); } catch (_) { showToast('清空失败，请稍后重试'); }
+  });
   document.querySelector('.back').addEventListener('click', () => showScreen('capture-screen'));
-  document.getElementById('restart').addEventListener('click', () => { items = []; showScreen('capture-screen'); });
+  document.getElementById('restart').addEventListener('click', async () => { await loadLocalWardrobe(); showScreen('capture-screen'); });
 
   document.getElementById('diagnose-button').addEventListener('click', () => {
     analysis.classList.add('open');
@@ -417,8 +569,7 @@
   function bindFeedback() {
     document.querySelectorAll('.feedback button').forEach(button => button.addEventListener('click', () => {
       button.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('chosen'));
-      button.classList.add('chosen'); toast.classList.add('show');
-      setTimeout(() => toast.classList.remove('show'), 1800);
+      button.classList.add('chosen'); showToast('已记录，会让下一次推荐更懂你');
     }));
   }
 
@@ -445,6 +596,7 @@
     renderCombination(Number(button.dataset.combo));
   }));
   renderCombination(0);
+  loadLocalWardrobe();
 
   // 在支持 WebMCP 的浏览器中，让智能助手可以触发与界面一致的示例诊断流程。
   const modelContext = document.modelContext;
